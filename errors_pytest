@@ -1,0 +1,228 @@
+
+tests/test_content.py::TestContent::test_unpublished PASSED                                                                                                      [  4%]
+tests/test_content.py::TestContent::test_only_own_pubs_in_category PASSED                                                                                        [  8%]
+tests/test_content.py::TestContent::test_only_own_pubs_in_profile PASSED                                                                                         [ 12%]
+tests/test_content.py::TestContent::test_unpublished_category PASSED                                                                                             [ 16%]
+tests/test_content.py::TestContent::test_future_posts PASSED                                                                                                     [ 20%]
+tests/test_content.py::TestContent::test_pagination PASSED                                                                                                       [ 24%]
+tests/test_content.py::TestContent::test_image_visible PASSED                                                                                                    [ 28%]
+tests/test_err_pages.py::test_custom_err_handlers PASSED                                                                                                         [ 32%]
+tests/test_users.py::test_custom_err_handlers PASSED                                                                                                             [ 36%]
+tests/test_users.py::test_profile PASSED                                                                                                                         [ 40%]
+tests/test_comment.py::test_comment_created_at PASSED                                                                                                            [ 44%]
+tests/test_comment.py::test_comment PASSED                                                                                                                       [ 48%]
+tests/test_comment.py::test_404_on_comment_deleted_post PASSED                                                                                                   [ 52%]
+tests/test_post.py::test_post_created_at PASSED                                                                                                                  [ 56%]
+tests/test_post.py::test_post FAILED                                                                                                                             [ 60%]
+tests/test_comment.py::TestCommentModelAttrs::test_model_attrs[`post` field] <- tests/conftest.py PASSED                                                         [ 64%]
+tests/test_comment.py::TestCommentModelAttrs::test_model_attrs[`author` field] <- tests/conftest.py PASSED                                                       [ 68%]
+tests/test_comment.py::TestCommentModelAttrs::test_model_attrs[`text` field] <- tests/conftest.py PASSED                                                         [ 72%]
+tests/test_comment.py::TestCommentModelAttrs::test_model_attrs[`created_at` field] <- tests/conftest.py PASSED                                                   [ 76%]
+tests/test_emails.py::test_gitignore PASSED                                                                                                                      [ 80%]
+tests/test_emails.py::test_email_backend_settings PASSED                                                                                                         [ 84%]
+tests/test_err_pages.py::test_csrf_failure_view PASSED                                                                                                           [ 88%]
+tests/test_post.py::TestPostModelAttrs::test_model_attrs[`image` field] <- tests/conftest.py PASSED                                                              [ 92%]
+tests/test_post.py::TestPostModelAttrs::test_model_attrs[`pub_date` field] <- tests/conftest.py PASSED                                                           [ 96%]
+tests/test_static_pages.py::test_static_pages_as_cbv PASSED                                                                                                      [100%]
+
+=============================================================================== FAILURES ===============================================================================
+______________________________________________________________________________ test_post _______________________________________________________________________________
+
+published_category = <Category: Foreign New Skill Especially Direction Hundred>, published_location = <Location: Mr. Jerome Austin IV>
+user_client = <django.test.client.Client object at 0x105cc4d50>, another_user_client = <django.test.client.Client object at 0x105cc4cd0>
+unlogged_client = <django.test.client.Client object at 0x105cc7e10>
+comment_to_a_post = <Comment: Nor investment try item. Stock contain new report.
+Congress major area pass everyone shake. Seek Mrs professor hard learn. Small pretty suddenly admit news receive about price.
+Accept how skill.>
+create_post_context_form_item = KeyVal(key='form', val=<PostForm bound=False, valid=False, fields=(is_published;title;text;pub_date;location;category;image)>)
+PostModel = <class 'blog.models.Post'>, CommentModelAdapter = <class 'adapters.comment.CommentModelAdapter.<locals>._CommentModelAdapter'>
+main_content_tester = <test_content.MainPostContentTester object at 0x105ce3990>
+
+    @pytest.mark.django_db(transaction=True)
+    def test_post(
+            published_category: Model,
+            published_location: Model,
+            user_client: django.test.Client,
+            another_user_client: django.test.Client,
+            unlogged_client: django.test.Client,
+            comment_to_a_post: Model,
+            create_post_context_form_item: Tuple[str, BaseForm],
+            PostModel: Type[Model],
+            CommentModelAdapter: CommentModelAdapterT,
+            main_content_tester: MainPostContentTester
+    ):
+        _, ctx_form = create_post_context_form_item
+    
+        create_a_post_get_response = get_create_a_post_get_response_safely(
+            user_client
+        )
+    
+        response_on_created, created_items = _test_create_items(
+            PostModel,
+            PostModelAdapter,
+            another_user_client,
+            create_a_post_get_response,
+            ctx_form,
+            published_category,
+            published_location,
+            unlogged_client,
+            user_client,
+        )
+    
+        # checking images are visible on post creation
+        created_content = response_on_created.content.decode('utf-8')
+        img_count = created_content.count('<img')
+        expected_img_count = main_content_tester.n_or_page_size(len(created_items))
+        assert img_count >= expected_img_count, (
+            'Убедитесь, что при создании публикации она отображается с картинкой.'
+        )
+    
+        edit_response, edit_url, del_url = _test_edit_post(
+            CommentModelAdapter,
+            another_user_client,
+            comment_to_a_post,
+            unlogged_client=unlogged_client,
+            user_client=user_client,
+        )
+    
+        item_to_delete_adapter = PostModelAdapter(
+            CommentModelAdapter(comment_to_a_post).post
+        )
+        del_url_addr = del_url.key
+    
+        del_unexisting_status_404_err_msg = (
+            "Убедитесь, что при обращении к странице удаления "
+            " несуществующего поста возвращается статус 404."
+        )
+        delete_tester = DeletePostTester(
+            item_to_delete_adapter.item_cls,
+            user_client,
+            another_user_client,
+            unlogged_client,
+            item_adapter=item_to_delete_adapter,
+        )
+        delete_tester.test_delete_item(
+            qs=item_to_delete_adapter.item_cls.objects.all(),
+            delete_url_addr=del_url_addr,
+        )
+        try:
+            AuthorisedSubmitTester(
+                tester=delete_tester,
+                test_response_cbk=SubmitTester.get_test_response_404_cbk(
+                    err_msg=delete_tester.nonexistent_obj_error_message
+                ),
+            ).test_submit(url=del_url_addr, data={})
+        except Post.DoesNotExist:
+            raise AssertionError(del_unexisting_status_404_err_msg)
+    
+        err_msg_unexisting_status_404 = (
+            "Убедитесь, что при обращении к странице "
+            " несуществующего поста возвращается статус 404."
+        )
+        try:
+            response = user_client.get(f"/posts/{item_to_delete_adapter.id}/")
+            assert response.status_code == HTTPStatus.NOT_FOUND, (
+                err_msg_unexisting_status_404)
+        except Post.DoesNotExist:
+            raise AssertionError(err_msg_unexisting_status_404)
+    
+        edit_status_code_not_404_err_msg = (
+            "Убедитесь, что при обращении к странице редактирования"
+            " несуществующего поста возвращается статус 404."
+        )
+        try:
+            response = user_client.get(edit_url[0])
+        except Post.DoesNotExist:
+            raise AssertionError(edit_status_code_not_404_err_msg)
+    
+        assert response.status_code == HTTPStatus.NOT_FOUND, (
+            edit_status_code_not_404_err_msg)
+    
+        @contextmanager
+        def set_post_unpublished(post_adapter):
+            is_published = post_adapter.is_published
+            try:
+                post_adapter.is_published = False
+                post_adapter.save()
+                yield
+            finally:
+                post_adapter.is_published = is_published
+                post_adapter.save()
+    
+        @contextmanager
+        def set_post_category_unpublished(post_adapter):
+            category = post_adapter.category
+            is_published = category.is_published
+            try:
+                category.is_published = False
+                category.save()
+                yield
+            finally:
+                category.is_published = is_published
+                category.save()
+    
+        @contextmanager
+        def set_post_postponed(post_adapter):
+            pub_date = post_adapter.pub_date
+            current_year = timezone.now().year
+            try:
+                post_adapter.pub_date = post_adapter.pub_date.replace(
+                    year=current_year + 1)
+                post_adapter.save()
+                yield
+            finally:
+                post_adapter.pub_date = pub_date
+                post_adapter.save()
+    
+        def check_post_access(client, post_adapter, err_msg, expected_status):
+            url = f"/posts/{post_adapter.id}/"
+            get_get_response_safely(client, url=url, err_msg=err_msg,
+                                    expected_status=expected_status)
+    
+        # Checking unpublished post
+    
+        detail_post_adapter = PostModelAdapter(created_items[0])
+    
+        with set_post_unpublished(detail_post_adapter):
+            check_post_access(
+                user_client, detail_post_adapter,
+                "Убедитесь, что страница поста, снятого с публикации, "
+                "доступна автору этого поста.",
+                expected_status=HTTPStatus.OK)
+>           check_post_access(
+                another_user_client, detail_post_adapter,
+                "Убедитесь, что страница поста, снятого с публикации, "
+                "доступна только автору этого поста.",
+                expected_status=HTTPStatus.NOT_FOUND)
+
+tests/test_post.py:223: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_post.py:210: in check_post_access
+    get_get_response_safely(client, url=url, err_msg=err_msg,
+tests/conftest.py:254: in get_get_response_safely
+    response = user_client.get(url)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/django/test/client.py:742: in get
+    response = super().get(path, data=data, secure=secure, **extra)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/django/test/client.py:396: in get
+    return self.generic('GET', path, secure=secure, **{
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/django/test/client.py:473: in generic
+    return self.request(**r)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/django/test/client.py:719: in request
+    self.check_exception(response)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/django/test/client.py:580: in check_exception
+    raise exc_value
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/django/core/handlers/exception.py:47: in inner
+    response = get_response(request)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/django/utils/deprecation.py:119: in __call__
+    response = self.process_response(request, response)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <django.middleware.clickjacking.XFrameOptionsMiddleware object at 0x105b97a50>, request = <WSGIRequest: GET '/posts/8/'>, response = '/profile/cdodson/'
+
+    def process_response(self, request, response):
+        # Don't set it if it's already in the response
+>       if response.get('X-Frame-Options') is not None:
+E       AttributeError: 'str' object has no attribute 'get'
+
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/django/middleware/clickjacking.py:26: AttributeError
+=============================================================== 1 failed, 24 passed, 2 warnings in 1.48s ===============================================================
